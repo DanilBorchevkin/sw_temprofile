@@ -3,11 +3,16 @@ Calc 5-order spline from dat file
 
 Implementation was taken from https://www.codecamp.ru/blog/curve-fitting-python/
 
+Calc Savitzky-Golay filter from dat file
+
+Implementation was taken from https://www.datatechnotes.com/2022/05/smoothing-example-with-savitzky-golay.html
+
 '''
 
 import glob
 import os
 import numpy as np
+from scipy import signal
 import matplotlib.pyplot as plt
 
 def dat_file_write(data_list: list, out_filepath: str, header : str = None) -> None:
@@ -55,7 +60,10 @@ def dat_file_read(in_filepath, has_header: bool = False) -> list:
 
     return read_list
 
-def calc_spline5(data_list : list, is_need_to_show : bool = False) -> list:
+def calc_data(data_list : list, is_need_to_show : bool = False) -> list:
+    '''
+    Calc output data
+    '''
     output_list = []
 
     # Read data from data_list dedicated list
@@ -67,18 +75,23 @@ def calc_spline5(data_list : list, is_need_to_show : bool = False) -> list:
         y.append(float(val[1]))
         y_tp_altitude.append(float(val[0]))
 
-    model = np.poly1d(np.polyfit(x, y, 5))
-    x_p = np.linspace(x[0], x[-1], len(x))
-    y_p = model(x_p)
+    # Calc 5-order spline
+    model_spline = np.poly1d(np.polyfit(x, y, 5))
+    x_spline5 = np.linspace(x[0], x[-1], len(x))
+    y_spline5 = model_spline(x_spline5)
+
+    # Calc Savitzky-Golay filter
+    y_s_g = signal.savgol_filter(y, window_length=11, polyorder=3, mode="nearest")
 
     if is_need_to_show:
         plt.scatter(x, y)
-        plt.plot(x_p, y_p, color='purple')
+        plt.plot(x_spline5, y_spline5, color='purple')
+        plt.plot(x_spline5, y_s_g, color='red')
         plt.show()
 
-    output_list.append(['idx', 'tp_altitude', 'temp' 'temp_spline5'])
-    for idx in range(x_p.size):
-        output_list.append([x_p[idx], y_tp_altitude[idx], y[idx], y_p[idx]])
+    output_list.append(['idx', 'tp_altitude', 'temp', 'temp_spline5', 'temp_s_g'])
+    for idx in range(x_spline5.size):
+        output_list.append([x_spline5[idx], y_tp_altitude[idx], y[idx], y_spline5[idx], y_s_g[idx]])
 
     return output_list
 
@@ -95,9 +108,9 @@ def main():
 
         try:
             data_list = dat_file_read(filepath, has_header=True)
-            spline_list = calc_spline5(data_list)
+            out_data_list = calc_data(data_list)
 
-            dat_file_write(spline_list, f"{OUTPUT_PATH}/{os.path.basename(filepath).split('.')[0]}_spline5.dat")
+            dat_file_write(out_data_list, f"{OUTPUT_PATH}/{os.path.basename(filepath).split('.')[0]}_out.dat")
             print("Successful >> " + filepath)
         except Exception as exception:
             print()
